@@ -1,6 +1,6 @@
 # tproxy
 
-[English](readme.md) | 简体中文
+[English](readme.md) | 简体中文 | [日本語](readme-ja.md)
 
 [![Go](https://github.com/kevwan/tproxy/workflows/Go/badge.svg?branch=main)](https://github.com/kevwan/tproxy/actions)
 [![Go Report Card](https://goreportcard.com/badge/github.com/kevwan/tproxy)](https://goreportcard.com/report/github.com/kevwan/tproxy)
@@ -47,6 +47,8 @@ $ tproxy --help
 Usage of tproxy:
   -d duration
     	the delay to relay packets
+  -down int
+    	Downward speed limit(bytes/second)
   -l string
     	Local address to listen on (default "localhost")
   -p int
@@ -57,6 +59,8 @@ Usage of tproxy:
   -s	Enable statistics
   -t string
     	The type of protocol, currently support http2, grpc, redis and mongodb
+  -up int
+    	Upward speed limit(bytes/second)
 ```
 
 ## 示例

@@ -43,13 +43,22 @@ func NewPairedConnection(id int, cliConn net.Conn) *PairedConnection {
 
 func (c *PairedConnection) copyData(dst io.Writer, src io.Reader, tag string) {
 	_, e := io.Copy(dst, src)
-	if e != nil && e != io.EOF {
+	if e != nil {
 		netOpError, ok := e.(*net.OpError)
 		if ok && netOpError.Err.Error() != useOfClosedConn {
 			reason := netOpError.Unwrap().Error()
 			display.PrintlnWithTime(color.HiRedString("[%d] %s error, %s", c.id, tag, reason))
 		}
 	}
+}
+
+func (c *PairedConnection) copyDataWithRateLimit(dst io.Writer, src io.Reader, tag string, limit int64) {
+	if limit > 0 {
+		bucket := ratelimit.NewBucket(time.Second, limit)
+		src = ratelimit.Reader(src, bucket)
+	}
+
+	c.copyData(dst, src, tag)
 }
 
 func (c *PairedConnection) handleClientMessage() {
@@ -59,12 +68,7 @@ func (c *PairedConnection) handleClientMessage() {
 	r, w := io.Pipe()
 	tee := io.MultiWriter(c.svrConn, w)
 	go protocol.CreateInterop(settings.Protocol).Dump(r, protocol.ClientSide, c.id, settings.Quiet)
-	var src io.Reader = c.cliConn
-	if settings.UpLimit > 0 {
-		bucket := ratelimit.NewBucket(time.Second, settings.UpLimit)
-		src = ratelimit.Reader(src, bucket)
-	}
-	c.copyData(tee, src, protocol.ClientSide)
+	c.copyDataWithRateLimit(tee, c.cliConn, protocol.ClientSide, settings.UpLimit)
 }
 
 func (c *PairedConnection) handleServerMessage() {
@@ -74,12 +78,7 @@ func (c *PairedConnection) handleServerMessage() {
 	r, w := io.Pipe()
 	tee := io.MultiWriter(newDelayedWriter(c.cliConn, settings.Delay, c.stopChan), w)
 	go protocol.CreateInterop(settings.Protocol).Dump(r, protocol.ServerSide, c.id, settings.Quiet)
-	var src io.Reader = c.svrConn
-	if settings.DownLimit > 0 {
-		bucket := ratelimit.NewBucket(time.Second, settings.DownLimit)
-		src = ratelimit.Reader(src, bucket)
-	}
-	c.copyData(tee, src, protocol.ServerSide)
+	c.copyDataWithRateLimit(tee, c.svrConn, protocol.ServerSide, settings.DownLimit)
 }
 
 func (c *PairedConnection) process() {
